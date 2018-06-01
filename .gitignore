@@ -1,0 +1,10 @@
+racebot.log
+Racebot.sqlite
+RGLtv-Racebot.iml
+RGLtv-Racebot.ipr
+RGLtv-Racebot.iws
+/META-INF
+/.idea
+/out
+/target
+racebot.ini
