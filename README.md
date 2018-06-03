@@ -14,7 +14,8 @@ In order to use this bot, you must register a new application with Discord.  Thi
 8. Copy the generated URL and visit it.
 9. Select the server you wish to add the bot to and authorize it.
 10. Create a "Bot Commander" role on the server and apply it to users that will have admin access to the racebot.  This role does not require any Discord privledges, it is only checked by name
-11. ".register" in all channels where races may occur.  The racebot will overwrite channel names and will not revert them to their original name.  All inactive race channels will be renamed to "inactive_race_channel" when not in use.
+11. Start the racebot (eg. "java -jar RGLtv-Racebot.jar")
+12. ".register" in all channels where races may occur.  The racebot will overwrite channel names and will not revert them to their original name.  All inactive race channels will be renamed to "inactive_race_channel" when not in use.
 
 ## Commands
 ### Everyone
