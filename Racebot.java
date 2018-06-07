@@ -141,7 +141,7 @@ public class Racebot {
             statement.execute(sql);
 
             //table translating a runner's discord name with a unique identifier based on their discord name
-            sql = "create table if not exists runner_translations(name varchar(255) PRIMARY KEY, proper varchar(255) NOT NULL)";
+            sql = "create table if not exists runner_lookup(runner_key varchar(255) PRIMARY KEY, name varchar(255) NOT NULL)";
             statement.execute(sql);
 
             //table of race channels that we monitor
@@ -775,23 +775,25 @@ public class Racebot {
         String parts[] = message.split(" ");
         if (parts.length > 1){
             if (parts[1].contains("#")) parts[1] = parts[1].replace("#", "");
-            String sql = "select * from runner_translations where name=?";
+            String sql = "select * from runner_lookup where name=?";
             try {
                 PreparedStatement ps = database.prepareStatement(sql);
-                ps.setString(1, parts[1].toLowerCase());
+                ps.setString(1, parts[1]);
                 ResultSet rs = ps.executeQuery();
 
-                String proper = "";
+                String runnerKey = "";
+                String runnerName = "";
                 boolean exists = false;
                 while (rs.next()){
-                    proper = rs.getString("proper");
+                    runnerKey = rs.getString("runner_key");
+                    runnerName = rs.getString("name");
                     exists = true;
                 }
 
                 if (exists){
                     String gameInfos = "";
 
-                    sql = "select * from "+ proper;
+                    sql = "select * from "+ runnerKey;
                     Statement statement = database.createStatement();
 
                     rs = statement.executeQuery(sql);
@@ -801,7 +803,7 @@ public class Racebot {
                         else gameInfos += rs.getString("gamemode") + ": Best time - " + timeFormatter(rs.getLong("best_time")) + " | Rating: " + rs.getInt("score") + "\n";
                     }
 
-                    sql = "select stream from streams where name='" + proper + "'";
+                    sql = "select stream from streams where name='" + runnerName + "'";
                     rs = statement.executeQuery(sql);
                     String stream = "";
                     while (rs.next()){
@@ -816,7 +818,7 @@ public class Racebot {
                             log(err.getMessage());
                         }
                     }
-                    e.getChannel().sendMessage("Racer " + proper + stream + ":\n"+gameInfos);
+                    e.getChannel().sendMessage("Racer " + runnerName + stream + ":\n"+gameInfos);
 
                 } else {
                     while (Racebot.softBlocking || Racebot.hardBlocking){

@@ -1,6 +1,7 @@
 import sx.blah.discord.handle.obj.IChannel;
 import sx.blah.discord.handle.obj.IUser;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -179,7 +180,6 @@ public class Race {
             return Racebot.boldUsername(racer) + "is not currently registered to Race "+getID()+".";
         }
 
-        //TODO check for race done
     }
 
     public int undoneRacer(IUser racer){
@@ -272,49 +272,95 @@ public class Race {
                             int casualInt = 0;
                             if (casual) casualInt = 1;
 
-                            String sql = "INSERT into races (number, date, time, game, mode, casual) values (" + getID() + ", '" + df.format(date) + "', '" + tod.format(date) + "', '" + sqlName(game) + "', '" + sqlName(mode) + "', "+casualInt+")";
-                            Statement statement = Racebot.database.createStatement();
-                            statement.execute(sql);
+                            String sql = "INSERT into races (number, date, time, game, mode, casual) values (?, ?, ?, ?, ?, ?)";
+                            PreparedStatement racesPS = Racebot.database.prepareStatement(sql);
+                            racesPS.setInt(1, getID());
+                            racesPS.setString(2, df.format(date));
+                            racesPS.setString(3, tod.format(date));
+                            racesPS.setString(4, game);
+                            racesPS.setString(5, mode);
+                            racesPS.setBoolean(6, casual);
+                            racesPS.execute();
+
 
                             sql = "create table race" + getID() + "(name varchar(255) PRIMARY KEY, time INTEGER)";
+                            Statement statement = Racebot.database.createStatement();
                             statement.execute(sql);
 
                             String dbGameMode =  sqlName(game + " - " + mode);
 
+                            sql = "INSERT into race" + getID() + "(name, time) values (?,?)";
+                            PreparedStatement racePS = Racebot.database.prepareStatement(sql);
+                            sql = "SELECT * FROM runner_lookup WHERE name = ?";
+                            PreparedStatement runnerTablePS = Racebot.database.prepareStatement(sql);
+                            sql = "insert or replace into runner_lookup (runner_key, name) values (?,?)";
+                            PreparedStatement newRunnerLookupPS = Racebot.database.prepareStatement(sql);
+
                             for (String r : racers.keySet()) {
+                                //Record race results
                                 Racer racer = racers.get(r);
-                                sql = "INSERT into race" + getID() + "(name, time) values ('" + r + "', " + racer.time + ")";
-                                statement.execute(sql);
+                                racePS.setString(1, r);
+                                racePS.setInt(2, (int)racer.time);
+                                racePS.execute();
 
-                                String dbName = racer.name.replace(" ","-")+racer.discriminator;
-                                sql = "create table if not exists "+ dbName +"(gamemode varchar(255) PRIMARY KEY, best_time INTEGER NOT NULL, score INTEGER NOT NULL)";
-                                statement.execute(sql);
+                                //Find user in lookup table
+                                String runnerTable = "";
+                                runnerTablePS.setString(1,racer.name+racer.discriminator);
+                                ResultSet runnerTableResults = runnerTablePS.executeQuery();
+                                while (runnerTableResults.next()){
+                                    runnerTable = runnerTableResults.getString("name");
+                                }
 
-                                sql = "insert or replace into runner_translations (name, proper) values ('" + dbName.toLowerCase() + "', '" + dbName + "')";
-                                statement.execute(sql);
+                                //User was not found, add to runner_translations and create the new table tracking this runner
+                                if (runnerTable.equals("")) {
+                                    //Lookup last used key to determine next available key
+                                    sql = "SELECT * FROM runner_lookup ORDER BY runner_key DESC LIMIT 1";
+                                    ResultSet lastIndexResult = statement.executeQuery(sql);
 
-                                sql = "select * from " + dbName + " where gamemode ='"+ dbGameMode + "'";
-                                ResultSet rs = statement.executeQuery(sql);
+                                    long nextAvailableKey = 0;
+                                    while (lastIndexResult.next()) {
+                                        String lastUserKey = lastIndexResult.getString("runner_key");
+                                        nextAvailableKey = Long.parseLong(lastUserKey.substring(6))+1;
+                                    }
+
+                                    //Add new key to runner_lookup
+                                    String newRunnerTableName = "runner"+nextAvailableKey;
+                                    newRunnerLookupPS.setString(1, newRunnerTableName);
+                                    newRunnerLookupPS.setString(2, racer.name+racer.discriminator);
+                                    newRunnerLookupPS.execute();
+
+                                    //Create new table for runner
+                                    sql = "create table if not exists " + newRunnerTableName + "(gamemode varchar(255) PRIMARY KEY, best_time INTEGER NOT NULL, score INTEGER NOT NULL)";
+                                    statement.execute(sql);
+
+                                    runnerTable = newRunnerTableName;
+                                }
+
+                                //Check if the runner's best time was beaten and pull their current rating
+
+                                sql = "select * from " + runnerTable + " where gamemode ='"+ dbGameMode + "'";
+                                ResultSet runnersTableResults = statement.executeQuery(sql); //TODO better name
 
                                 boolean result = false;
-                                while (rs.next()){
+                                while (runnersTableResults.next()){
                                     result = true;
-                                    long bestTime = rs.getLong("best_time");
-                                    racer.previousRating = rs.getInt("score");
+                                    long bestTime = runnersTableResults.getLong("best_time");
+                                    racer.previousRating = runnersTableResults.getInt("score");
 
                                     if (racer.time < bestTime){
-                                        sql = "update " + dbName + " set best_time=" + racer.time + " where gamemode='" + dbGameMode + "'";
+                                        sql = "update " + runnerTable + " set best_time=" + racer.time + " where gamemode='" + dbGameMode + "'";
                                         statement.execute(sql);
                                     }
                                 }
 
+                                //A current best was not found, so use this one
                                 if (!result){
-                                    sql = "insert into " + dbName + "(gamemode, best_time, score) values('" + dbGameMode + "', " + racer.time + ", 1500)";
+                                    sql = "insert into " + runnerTable + "(gamemode, best_time, score) values('" + dbGameMode + "', " + racer.time + ", 1500)";
                                     statement.execute(sql);
                                 }
                             }
 
-
+                            //This race is for points
                             if (!casual){
                                 for (String r : racers.keySet()){
                                     Racer r1 = racers.get(r);
@@ -332,9 +378,16 @@ public class Race {
                                         }
                                     }
 
-                                    String dbName = r1.name+r1.discriminator;
+                                    String r1Table = "";
+                                    runnerTablePS.setString(1,r1.name+r1.discriminator);
+                                    ResultSet runnerTableResults = runnerTablePS.executeQuery();
+                                    while (runnerTableResults.next()){
+                                        r1Table = runnerTableResults.getString("runner_key");
+                                    }
+
+                                    //TODO PreparedStatement would be better here
                                     long score = r1.previousRating + Math.round(changeRating);
-                                    sql = "update " + dbName + " set score= " + score + " where gamemode='" + dbGameMode + "'";
+                                    sql = "update " + r1Table + " set score= " + score + " where gamemode='" + dbGameMode + "'";
                                     statement.execute(sql);
 
                                 }
@@ -349,6 +402,7 @@ public class Race {
 
                         state = State.Finalized;
 
+                        //wait for blocks to lift
                         while (Racebot.softBlocking || Racebot.hardBlocking){
                             try {
                                 Thread.sleep(100);
