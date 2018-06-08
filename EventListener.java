@@ -198,6 +198,7 @@ public class EventListener {
                 +"\n**.race remove  *#*** - removes the indicated race from the list of active races"
                 +"\n**.start -f** - Force starts a race where runners have not readied."
                 +"\n**.register** - Registers channel as a race channel."
+                +"\n**.shortcut *shortcut*, *full name*** - Assigns a shorthand code that the racebot will convert to the full name (ie.  \"smb\" can be changed to \"Super Mario Bros.\" automatically when creating new races).  These shortcuts apply to both game and mode names."
                 +"\n**.mode *(normal or tournament)*** - Sets the current mode of the racebot.  Tournament mode prevents non-admins from starting races.");
 
     }
