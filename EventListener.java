@@ -142,7 +142,9 @@ public class EventListener {
             }
             channel.sendMessage("Registering race channel");
             racebot.registerChannel(channel);
-
+        }
+        else if (mesL.startsWith(".shortcut ") && botCommander) {
+            racebot.addShortcut(channel, message);
         }
         else if (mesL.equals(".ping")) {
             while (Racebot.softBlocking || Racebot.hardBlocking){

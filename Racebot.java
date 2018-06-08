@@ -23,7 +23,7 @@ import java.util.HashMap;
 
 public class Racebot {
     public static final boolean debug = false; // flag to turn on debug messages
-    public static final String rbVersion = "1.09"; //version
+    public static final String rbVersion = "1.11"; //version
     public static FileWriter logger;  //used to log errors to a file
 
     private IDiscordClient client; //main discord client for interacting with discord
@@ -148,6 +148,10 @@ public class Racebot {
             sql = "create table if not exists race_channels(guild INTEGER, channel INTEGER UNIQUE)";
             statement.execute(sql);
 
+            //table of race channels that we monitor
+            sql = "create table if not exists shortcuts(shortcut varchar(255) PRIMARY KEY, proper varchar(255) NOT NULL)";
+            statement.execute(sql);
+
             //read next available race id
             sql = "SELECT * FROM races ORDER BY number DESC LIMIT 1";
             ResultSet  results = statement.executeQuery(sql);
@@ -218,7 +222,7 @@ public class Racebot {
 
                 if (message.split(",").length > 1) {
                     String gameName = gameShortcuts(commands[2].split(",")[0].trim());
-                    String modeName = modeShortcuts(commands[2].split(",")[1].trim());
+                    String modeName = gameShortcuts(commands[2].split(",")[1].trim());
 
                     int thisID = nextRaceID;
                     nextRaceID++;
@@ -400,7 +404,7 @@ public class Racebot {
                                 String game = commands[3].split(",")[0].trim();
                                 String mode = commands[3].split(",")[1].trim();
                                 game = gameShortcuts(game);
-                                mode = modeShortcuts(mode);
+                                mode = gameShortcuts(mode);
 
                                 thisRace.editRace(game, mode);
 
@@ -1099,54 +1103,107 @@ public class Racebot {
         return status;
     }
 
-    public String gameShortcuts(String longName){
-        String lowered = longName.toLowerCase();
-        switch(lowered){
-            case "cnd":
-            case "chip n dale": return "Chip 'n Dale";
-            case "loz":
-            case "z1": return "The Legend of Zelda";
-            case "alttp":
-            case "lttp":
-            case "z3": return "The Legend of Zelda: A Link to the Past";
-            case "dt": return "Ducktales";
-            case "dt2": return "Ducktales 2";
-            case "cnt":
-            case "cnt2": return "Chip 'n Tales 2";
-            case "smw": return "Super Mario World";
-            case "smb":
-            case "smb1": return "Super Mario Bros.";
-            case "smb2": return "Super Mario Bros. 2";
-            case "smb3": return "Super Mario Bros. 3";
-            case "smbj": return "Super Mario Bros: The Lost Levels";
-            case "mm1": return "Mega Man 1";
-            case "mm2": return "Mega Man 2";
-            case "mm3": return "Mega Man 3";
-            case "mm4": return "Mega Man 4";
-            case "mm5": return "Mega Man 5";
-            case "mm6": return "Mega Man 6";
-            case "cv":
-            case "cv1": return "Castlevania";
-            case "cv2": return "Castlevania";
-            case "cv3": return "Castlevania";
-            case "ng": return "Ninja Gaiden";
-            case "ml1": return "Mystery League Season 1";
+    public void addShortcut(IChannel channel, String message){
+        String[] parts = message.split(",", 2);
+        if (parts.length > 1){
+            boolean overwrite = false;
+            String shortcut = parts[0].replace(".shortcut ", "").trim();
+            if (shortcut.startsWith("overwrite ")){
+                overwrite = true;
+                shortcut = shortcut.replace("overwrite ", "").trim();
+            }
 
+            String proper = parts[1].trim();
+            try {
+                String sql = "SELECT * FROM shortcuts WHERE shortcut = ?";
+                String currentShortcut = "";
+                PreparedStatement shortcutLookupPS = database.prepareStatement(sql);
+                shortcutLookupPS.setString(1, shortcut);
+                ResultSet shortcutLookupResults = shortcutLookupPS.executeQuery();
+                while (shortcutLookupResults.next()){
+                    currentShortcut = shortcutLookupResults.getString("proper");
+                }
+
+                if (!currentShortcut.equals("")){
+                    if (overwrite){
+                        sql = "update shortcuts set proper=? where shortcut=?";
+                        PreparedStatement overwriteShortCutPS = database.prepareStatement(sql);
+                        overwriteShortCutPS.setString(1, proper);
+                        overwriteShortCutPS.setString(2, shortcut);
+                        overwriteShortCutPS.execute();
+
+
+                        while (Racebot.softBlocking || Racebot.hardBlocking){
+                            try {
+                                Thread.sleep(100);
+                            } catch (InterruptedException err) {
+                                err.printStackTrace();
+                                log(err.getMessage());
+                            }
+                        }
+                        channel.sendMessage("Shortcut was successfully updated.");
+                    } else {
+                        while (Racebot.softBlocking || Racebot.hardBlocking){
+                            try {
+                                Thread.sleep(100);
+                            } catch (InterruptedException err) {
+                                err.printStackTrace();
+                                log(err.getMessage());
+                            }
+                        }
+                        channel.sendMessage("This shortcut is currently assigned to \""+currentShortcut+"\".  Please use the **overwrite** keyword if you wish to change the current shortcut (.shortcut overwrite *shortcut*, *full name*)");
+                    }
+
+                } else {
+                    sql = "INSERT into shortcuts(shortcut, proper) values (?,?)";
+                    PreparedStatement newShortCutPS = database.prepareStatement(sql);
+                    newShortCutPS.setString(1, shortcut);
+                    newShortCutPS.setString(2, proper);
+                    newShortCutPS.execute();
+
+
+                    while (Racebot.softBlocking || Racebot.hardBlocking){
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException err) {
+                            err.printStackTrace();
+                            log(err.getMessage());
+                        }
+                    }
+                    channel.sendMessage("Shortcut was successfully added.");
+                }
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+                log(e.getMessage());
+            }
+        } else {
+            while (Racebot.softBlocking || Racebot.hardBlocking){
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException err) {
+                    err.printStackTrace();
+                    log(err.getMessage());
+                }
+            }
+            channel.sendMessage("Malformed shortcut request.");
         }
-        return longName;
     }
 
-    public String modeShortcuts(String longName){
-        String lowered = longName.toLowerCase();
-        switch(lowered){
-            case "any":
-            case "beat the game": return "any%";
-            case "rando":
-            case "random":
-            case "randomizer": return "random%";
-        }
+    public String gameShortcuts(String name){
+        String sql = "SELECT * FROM shortcuts WHERE shortcut = ?";
+        try {
+            PreparedStatement shortcutLookupPS = database.prepareStatement(sql);
+            shortcutLookupPS.setString(1, name);
+            ResultSet shortcutLookupResults = shortcutLookupPS.executeQuery();
 
-        return longName;
+            while (shortcutLookupResults.next()){
+                return shortcutLookupResults.getString("proper");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return name;
     }
 
     public static String timeFormatter(long timeInNanos){
