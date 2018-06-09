@@ -3,6 +3,7 @@ import sx.blah.discord.api.IDiscordClient;
 import sx.blah.discord.api.events.EventDispatcher;
 import sx.blah.discord.handle.obj.*;
 import sx.blah.discord.util.DiscordException;
+import sx.blah.discord.util.RequestBuffer;
 
 import java.io.*;
 import java.sql.*;
@@ -198,6 +199,36 @@ public class Racebot {
 
     }
 
+    public static void requestedMessage(IChannel channel, String message){
+        while (Racebot.softBlocking || Racebot.hardBlocking){
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException err) {
+                err.printStackTrace();
+                log(err.getMessage());
+            }
+        }
+
+        RequestBuffer.request(() -> {
+           channel.sendMessage(message);
+        });
+    }
+
+    public static void requestedChannelNameChange(IChannel channel, String name){
+        while (Racebot.softBlocking || Racebot.hardBlocking){
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException err) {
+                err.printStackTrace();
+                log(err.getMessage());
+            }
+        }
+
+        RequestBuffer.request(() -> {
+            channel.changeName(name);
+        });
+    }
+
     //.race command was received, handle it
     public void raceCommands(IMessage im, String message, boolean botCommander){
         //Divide commands into a max of 3 parts
@@ -231,17 +262,8 @@ public class Racebot {
                     if (chan != null) {
                         races.put(thisID, new Race(thisID, gameName, modeName, chan, casual, this));
 
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
-
-                        im.getChannel().sendMessage("Race "+thisID+" created: "+gameName+", "+modeName);
-                        chan.changeName(thisID + "_" + channelNameCleaner(gameName) + "_-_" + channelNameCleaner(modeName));
+                        requestedMessage(im.getChannel(), "Race "+thisID+" created: "+gameName+", "+modeName);
+                        requestedChannelNameChange(chan, thisID + "_" + channelNameCleaner(gameName) + "_-_" + channelNameCleaner(modeName));
 
                         String ats = "";
 
@@ -253,18 +275,10 @@ public class Racebot {
                             }
                         }
 
-                        chan.sendMessage("Race " + thisID + " - " + gameName + ", " + modeName + " - is happening here! " + ats);
+                        requestedMessage(im.getChannel(),"Race " + thisID + " - " + gameName + ", " + modeName + " - is happening here! " + ats);
                     } else {
 
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
-                        im.getChannel().sendMessage("All race channels for this server are currently occupied.\nPlease wait for one to free, or have an admin register a new channel");
+                        requestedMessage(im.getChannel(), "All race channels for this server are currently occupied.\nPlease wait for one to free, or have an admin register a new channel");
                     }
 
                 }
@@ -272,15 +286,7 @@ public class Racebot {
                 if (commands.length > 2 && commands[2].replace("#","").matches("[0-9]+")){
                     int raceID = Integer.parseInt(commands[2].replace("#",""));
                     if (races.containsKey(raceID)){
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
-                        im.getChannel().sendMessage(races.get(raceID).getInfo());
+                        requestedMessage(im.getChannel(), races.get(raceID).getInfo());
                     } else {
                         String sql = "SELECT * from races where number=" + raceID;
                         try {
@@ -308,9 +314,9 @@ public class Racebot {
                                     else infoResponse += user + " - Finished - " + timeFormatter(rs.getLong("time")) + "\n";
                                 }
 
-                                im.getChannel().sendMessage(infoResponse);
+                                requestedMessage(im.getChannel(), infoResponse);
                             } else {
-                                im.getChannel().sendMessage("No race found with ID " + raceID);
+                                requestedMessage(im.getChannel(), "No race found with ID " + raceID);
                             }
 
                         } catch (SQLException e1) {
@@ -323,25 +329,10 @@ public class Racebot {
                     for (Integer i : races.keySet()) {
                         if (races.get(i).getChannel().getLongID() == im.getChannel().getLongID()) {
                             Race r = races.get(i);
-                            while (Racebot.softBlocking || Racebot.hardBlocking){
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException err) {
-                                    err.printStackTrace();
-                                    log(err.getMessage());
-                                }
-                            }
-                            im.getChannel().sendMessage(r.getInfo());
+
+                            requestedMessage(im.getChannel(), r.getInfo());
                         } else {
-                            while (Racebot.softBlocking || Racebot.hardBlocking){
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException err) {
-                                    err.printStackTrace();
-                                    log(err.getMessage());
-                                }
-                            }
-                            im.getChannel().sendMessage("No race currently assigned to this channel.");
+                            requestedMessage(im.getChannel(), "No race currently assigned to this channel.");
                         }
                     }
                 }
@@ -353,43 +344,17 @@ public class Racebot {
                             if (races.get(raceID).getState() == Race.State.Prerace) {
                                 if (raceID == nextRaceID - 1) nextRaceID = raceID; // This was the last race created, safe to reuse the ID
                                 IChannel chan = races.get(raceID).getChannel();
-                                if (chan.getLongID() == 393230283937415189L) chan.changeName("openracechannel_inactive");
-                                else chan.changeName("inactive_race_channel");
+                                requestedChannelNameChange(chan, "inactive_race_channel");
                                 removeRace(raceID);
 
                             }
-
-                            while (Racebot.softBlocking || Racebot.hardBlocking) {
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException err) {
-                                    err.printStackTrace();
-                                    log(err.getMessage());
-                                }
-                            }
-                            im.getChannel().sendMessage("Race "+raceID+" successfully removed.");
+                            requestedMessage(im.getChannel(), "Race "+raceID+" successfully removed.");
                         } else {
-                            while (Racebot.softBlocking || Racebot.hardBlocking) {
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException err) {
-                                    err.printStackTrace();
-                                    log(err.getMessage());
-                                }
-                            }
-                            im.getChannel().sendMessage("No active race with id "+raceID+" found.");
+                            requestedMessage(im.getChannel(), "No active race with id "+raceID+" found.");
                         }
                     }
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking) {
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    im.getChannel().sendMessage("User not authorized to perform this action");
+                    requestedMessage(im.getChannel(), "User not authorized to perform this action");
                 }
             } else if (commands[1].equalsIgnoreCase("edit")) {
                 if (botCommander){
@@ -408,50 +373,16 @@ public class Racebot {
 
                                 thisRace.editRace(game, mode);
 
-
-
-                                while (Racebot.softBlocking || Racebot.hardBlocking) {
-                                    try {
-                                        Thread.sleep(100);
-                                    } catch (InterruptedException err) {
-                                        err.printStackTrace();
-                                        log(err.getMessage());
-                                    }
-                                }
-                                im.getChannel().sendMessage("Race " + raceID + " successfully modified.");
+                                requestedMessage(im.getChannel(), "Race " + raceID + " successfully modified.");
                             } else {
-                                while (Racebot.softBlocking || Racebot.hardBlocking) {
-                                    try {
-                                        Thread.sleep(100);
-                                    } catch (InterruptedException err) {
-                                        err.printStackTrace();
-                                        log(err.getMessage());
-                                    }
-                                }
-                                im.getChannel().sendMessage("Malformed edit command.  Please type better.");
+                                requestedMessage(im.getChannel(), "Malformed edit command.  Please type better.");
                             }
                         } else {
-                            while (Racebot.softBlocking || Racebot.hardBlocking) {
-                                try {
-                                    Thread.sleep(100);
-                                } catch (InterruptedException err) {
-                                    err.printStackTrace();
-                                    log(err.getMessage());
-                                }
-                            }
-                            im.getChannel().sendMessage("No active race with id "+raceID+" found.");
+                            requestedMessage(im.getChannel(), "No active race with id "+raceID+" found.");
                         }
                     }
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking) {
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    im.getChannel().sendMessage("User not authorized to perform this action");
+                    requestedMessage(im.getChannel(), "User not authorized to perform this action");
                 }
             }
         }
@@ -464,28 +395,10 @@ public class Racebot {
                 if (races.get(i).getState() == Race.State.Prerace) {
                     returnCode = races.get(i).addRacer(user);
 
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-
-                    if (returnCode == 1) channel.sendMessage(boldUsername(user) + " is already entered into this race.");
-                    else channel.sendMessage(boldUsername(user) + " has joined **Race "+races.get(i).getID()+"**");
+                    if (returnCode == 1) requestedMessage( channel,boldUsername(user) + " is already entered into this race.");
+                    else requestedMessage(channel,boldUsername(user) + " has joined **Race "+races.get(i).getID()+"**");
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-
-                    channel.sendMessage("Race "+races.get(i).getID()+" is not currently joinable.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is not currently joinable.");
                 }
 
             }
@@ -499,26 +412,11 @@ public class Racebot {
                 int returnCode = 0;
                 if (races.get(i).getState() == Race.State.Prerace) {
                     returnCode = races.get(i).removeRacer(user);
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    if (returnCode == 1) channel.sendMessage(boldUsername(user) + " is not currently entered into this race.");
-                    else channel.sendMessage(boldUsername(user) + " has left **Race "+races.get(i).getID()+"**");
+
+                    if (returnCode == 1) requestedMessage(channel,boldUsername(user) + " is not currently entered into this race.");
+                    else requestedMessage(channel,boldUsername(user) + " has left **Race "+races.get(i).getID()+"**");
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is not currently leaveable.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is not currently leaveable.");
                 }
 
             }
@@ -531,27 +429,11 @@ public class Racebot {
                 int returnCode = 0;
                 if (races.get(i).getState() == Race.State.Prerace) {
                     returnCode = races.get(i).readyRacer(user);
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    if (returnCode == 0) channel.sendMessage(boldUsername(user) + " is ready. "+races.get(i).unreadyCount()+" of "+races.get(i).getRacers().size()+" remaining.");
-                    else if (returnCode == 2) channel.sendMessage(boldUsername(user) + " is already ready. "+races.get(i).unreadyCount()+" remaining.");
-                    else channel.sendMessage(boldUsername(user) + " is not currently registered to **Race "+races.get(i).getID()+"**");
+                    if (returnCode == 0) requestedMessage(channel,boldUsername(user) + " is ready. "+races.get(i).unreadyCount()+" of "+races.get(i).getRacers().size()+" remaining.");
+                    else if (returnCode == 2) requestedMessage(channel,boldUsername(user) + " is already ready. "+races.get(i).unreadyCount()+" remaining.");
+                    else requestedMessage(channel,boldUsername(user) + " is not currently registered to **Race "+races.get(i).getID()+"**");
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is already "+races.get(i).getState()+".  Unable to ready.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is already "+races.get(i).getState()+".  Unable to ready.");
                 }
 
             }
@@ -564,27 +446,12 @@ public class Racebot {
                 int returnCode = 0;
                 if (races.get(i).getState() == Race.State.Prerace) {
                     returnCode = races.get(i).unreadyRacer(user);
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    if (returnCode == 0) channel.sendMessage(boldUsername(user) + " is no longer ready. "+races.get(i).unreadyCount()+" racers not ready.");
-                    else if (returnCode == 2) channel.sendMessage(boldUsername(user) + " is already not ready. "+races.get(i).unreadyCount()+" racers not ready.");
-                    else channel.sendMessage(boldUsername(user) + " is not currently registered to **Race "+races.get(i).getID()+"**");
+
+                    if (returnCode == 0) requestedMessage(channel,boldUsername(user) + " is no longer ready. "+races.get(i).unreadyCount()+" racers not ready.");
+                    else if (returnCode == 2) requestedMessage(channel,boldUsername(user) + " is already not ready. "+races.get(i).unreadyCount()+" racers not ready.");
+                    else requestedMessage(channel,boldUsername(user) + " is not currently registered to **Race "+races.get(i).getID()+"**");
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is already "+races.get(i).getState()+".  Unable to unready.");
+                    requestedMessage(channel, "Race "+races.get(i).getID()+" is already "+races.get(i).getState()+".  Unable to unready.");
                 }
 
             }
@@ -603,32 +470,16 @@ public class Racebot {
                     if (r.unreadyCount() == 0){
                         r.start();
                     } else {
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
                         if (forced){
                             r.start();
                         } else {
-                            if (r.unreadyCount() == 1) channel.sendMessage("There is " + r.unreadyCount() + " racer currently not ready.  Unable to start.");
-                            else channel.sendMessage("There are " + r.unreadyCount() + " racers currently not ready.  Unable to start.");
+                            if (r.unreadyCount() == 1) requestedMessage(channel,"There is " + r.unreadyCount() + " racer currently not ready.  Unable to start.");
+                            else requestedMessage(channel,"There are " + r.unreadyCount() + " racers currently not ready.  Unable to start.");
                         }
 
                     }
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+r.getID()+" is already "+r.getState()+".  Unable to start.");
+                    requestedMessage(channel,"Race "+r.getID()+" is already "+r.getState()+".  Unable to start.");
                 }
 
             }
@@ -641,26 +492,11 @@ public class Racebot {
                 Race r = races.get(i);
                 if (r.getState() == Race.State.In_Progress) {
                     String finishQuote = r.doneRacer(user);
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    if (finishQuote != null ) channel.sendMessage(finishQuote);
+
+                    if (finishQuote != null ) requestedMessage(channel, finishQuote);
                     r.checkForRaceFinish();
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is not currently in progress.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is not currently in progress.");
                 }
 
             }
@@ -674,27 +510,12 @@ public class Racebot {
                 Race r = races.get(i);
                 if (r.getState() == Race.State.In_Progress || r.getState() == Race.State.Finished) {
                     returnCode = r.undoneRacer(user);
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    if (returnCode == 0) channel.sendMessage(boldUsername(user) + " is no longer done.");
-                    else if (returnCode == 1) channel.sendMessage(boldUsername(user) + " is not registered to this race.");
-                    else if (returnCode == 2) channel.sendMessage(boldUsername(user) + " has not yet finished.");
+
+                    if (returnCode == 0) requestedMessage(channel,boldUsername(user) + " is no longer done.");
+                    else if (returnCode == 1) requestedMessage(channel,boldUsername(user) + " is not registered to this race.");
+                    else if (returnCode == 2) requestedMessage(channel,boldUsername(user) + " has not yet finished.");
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is not currently in progress.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is not currently in progress.");
                 }
 
             }
@@ -708,29 +529,14 @@ public class Racebot {
                 Race r = races.get(i);
                 if (r.getState() == Race.State.In_Progress) {
                     returnCode = r.forfeitRacer(user);
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    if (returnCode == 0) channel.sendMessage(boldUsername(user) + " has forfeit.");
-                    else if (returnCode == 1) channel.sendMessage(boldUsername(user) + " is not registered to this race.");
-                    else if (returnCode == 2) channel.sendMessage(boldUsername(user) + " has already finished.");
-                    else if (returnCode == 3) channel.sendMessage(boldUsername(user) + " has already forfeited.");
+
+                    if (returnCode == 0) requestedMessage(channel,boldUsername(user) + " has forfeit.");
+                    else if (returnCode == 1) requestedMessage(channel,boldUsername(user) + " is not registered to this race.");
+                    else if (returnCode == 2) requestedMessage(channel,boldUsername(user) + " has already finished.");
+                    else if (returnCode == 3) requestedMessage(channel,boldUsername(user) + " has already forfeited.");
                     r.checkForRaceFinish();
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is not currently in progress.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is not currently in progress.");
                 }
 
             }
@@ -746,29 +552,13 @@ public class Racebot {
                     returnCode = r.forceFinish();
 
                     if (returnCode == 0){
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
 
-                        channel.sendMessage(returnCode +" racers forcibly forfeit.");
+                        requestedMessage(channel,returnCode +" racers forcibly forfeit.");
                     }
 
 
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Race "+races.get(i).getID()+" is not currently in progress.");
+                    requestedMessage(channel,"Race "+races.get(i).getID()+" is not currently in progress.");
                 }
 
             }
@@ -814,27 +604,10 @@ public class Racebot {
                         stream = " (stream: " + rs.getString("stream") + ")";
                     }
 
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    e.getChannel().sendMessage("Racer " + runnerName + stream + ":\n"+gameInfos);
+                    requestedMessage(e.getChannel(),"Racer " + runnerName + stream + ":\n"+gameInfos);
 
                 } else {
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-
-                    e.getChannel().sendMessage("No information found for " + parts[1]);
+                    requestedMessage(e.getChannel(),"No information found for " + parts[1]);
                 }
 
 
@@ -857,26 +630,9 @@ public class Racebot {
             }
             raceList += "```";
 
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-
-            channel.sendMessage(raceList);
+            requestedMessage(channel,raceList);
         } else {
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-            channel.sendMessage("No currently active races.");
+            requestedMessage(channel,"No currently active races.");
         }
     }
 
@@ -889,37 +645,18 @@ public class Racebot {
             sql = "insert into race_channels (guild, channel) values ('"+channel.getGuild().getLongID()+"', '"+channel.getLongID()+"')";
             statement.execute(sql);
 
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-
             if (!raceGuilds.containsKey(channel.getGuild().getLongID())) raceGuilds.put(channel.getGuild().getLongID(), new RaceGuild());
 
             raceGuilds.get(channel.getGuild().getLongID()).addChannel(channel);
 
-            if (channel.getLongID() == 393230283937415189L) channel.changeName("OpenRaceRoom_inactive");
-            else channel.changeName("inactive_race_channel");
+            requestedChannelNameChange(channel, "inactive_race_channel");
 
-            channel.sendMessage("Channel successfully registered as a race channel");
+            requestedMessage(channel,"Channel successfully registered as a race channel");
 
 
         } catch (SQLException e) {
             if (e.getMessage().startsWith("[SQLITE_CONSTRAINT_UNIQUE]")){
-                while (Racebot.softBlocking || Racebot.hardBlocking){
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException err) {
-                        err.printStackTrace();
-                        log(err.getMessage());
-                    }
-                }
-
-                channel.sendMessage("Channel is already registered");
+                requestedMessage(channel,"Channel is already registered");
             } else {
                 e.printStackTrace();
                 System.out.println(e.getMessage());
@@ -953,15 +690,7 @@ public class Racebot {
                 ps.setString(2, stream);
                 ps.executeUpdate();
 
-                while (Racebot.softBlocking || Racebot.hardBlocking){
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException err) {
-                        err.printStackTrace();
-                        log(err.getMessage());
-                    }
-                }
-                channel.sendMessage("Stream **" + stream + "** set for " +boldUsername(user) + ".");
+                requestedMessage(channel,"Stream **" + stream + "** set for " +boldUsername(user) + ".");
             } catch (SQLException e) {
                 e.printStackTrace();
                 log(e.getMessage());
@@ -978,51 +707,20 @@ public class Racebot {
                 if (races.get(i).getChannel().getLongID() == channel.getLongID()){
                     Race r = races.get(i);
                     matchFound = true;
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage(r.getMulti());
+                    requestedMessage(channel, r.getMulti());
                 }
             }
 
             if (!matchFound) {
-                while (Racebot.softBlocking || Racebot.hardBlocking){
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException err) {
-                        err.printStackTrace();
-                        log(err.getMessage());
-                    }
-                }
-                channel.sendMessage("No active race in this channel.");
+                requestedMessage(channel,"No active race in this channel.");
             }
         } else if (parts.length > 1 && parts[1].matches("[0-9]+")){
             int id = Integer.parseInt(parts[1]);
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-            if (races.containsKey(id)) channel.sendMessage(races.get(id).getMulti());
-            else channel.sendMessage("No active race with that number.");
+
+            if (races.containsKey(id)) requestedMessage(channel,races.get(id).getMulti());
+            requestedMessage(channel,"No active race with that number.");
         } else {
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-            channel.sendMessage("Malformed request.  Please use .rbhelp for assistance in formatting commands");
+            requestedMessage(channel,"Malformed request.  Please use .rbhelp for assistance in formatting commands");
         }
     }
 
@@ -1040,19 +738,10 @@ public class Racebot {
                 client.changePresence(StatusType.ONLINE, ActivityType.WATCHING, "Casual Races");
             }
 
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-
             String mode;
             if (restrictedMode) mode = "tournament";
             else mode = "normal";
-            channel.sendMessage("Now in "+mode+" mode.");
+            requestedMessage(channel,"Now in "+mode+" mode.");
         }
     }
 
@@ -1068,27 +757,11 @@ public class Racebot {
             if (races.get(i).getChannel().getLongID() == channel.getLongID()){
                 Race r = races.get(i);
                 matchFound = true;
-                while (Racebot.softBlocking || Racebot.hardBlocking){
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException err) {
-                        err.printStackTrace();
-                        log(err.getMessage());
-                    }
-                }
-                channel.sendMessage(r.getTime());
+                requestedMessage(channel,r.getTime());
             }
         }
         if (!matchFound) {
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-            channel.sendMessage("No active race in this channel.");
+            requestedMessage(channel,"No active race in this channel.");
         }
     }
 
@@ -1133,25 +806,9 @@ public class Racebot {
                         overwriteShortCutPS.execute();
 
 
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
-                        channel.sendMessage("Shortcut was successfully updated.");
+                        requestedMessage(channel,"Shortcut was successfully updated.");
                     } else {
-                        while (Racebot.softBlocking || Racebot.hardBlocking){
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException err) {
-                                err.printStackTrace();
-                                log(err.getMessage());
-                            }
-                        }
-                        channel.sendMessage("This shortcut is currently assigned to \""+currentShortcut+"\".  Please use the **overwrite** keyword if you wish to change the current shortcut (.shortcut overwrite *shortcut*, *full name*)");
+                        requestedMessage(channel,"This shortcut is currently assigned to \""+currentShortcut+"\".  Please use the **overwrite** keyword if you wish to change the current shortcut (.shortcut overwrite *shortcut*, *full name*)");
                     }
 
                 } else {
@@ -1162,15 +819,7 @@ public class Racebot {
                     newShortCutPS.execute();
 
 
-                    while (Racebot.softBlocking || Racebot.hardBlocking){
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException err) {
-                            err.printStackTrace();
-                            log(err.getMessage());
-                        }
-                    }
-                    channel.sendMessage("Shortcut was successfully added.");
+                    requestedMessage(channel,"Shortcut was successfully added.");
                 }
 
             } catch (SQLException e) {
@@ -1178,15 +827,7 @@ public class Racebot {
                 log(e.getMessage());
             }
         } else {
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    log(err.getMessage());
-                }
-            }
-            channel.sendMessage("Malformed shortcut request.");
+            requestedMessage(channel,"Malformed shortcut request.");
         }
     }
 

@@ -197,7 +197,7 @@ public class Race {
                 if (state == State.Finished){
                     state = State.In_Progress;
                     if (f != null) f.cancel();
-                    channel.sendMessage("Race " + getID() + " is longer finished.  Retracting GGs.");
+                    Racebot.requestedMessage(channel, "Race " + getID() + " is longer finished.  Retracting GGs.");
                 }
                 return 0;
             } else {
@@ -257,15 +257,8 @@ public class Race {
 
         if (undone == false){
             state = State.Finished;
-            while (Racebot.softBlocking || Racebot.hardBlocking){
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException err) {
-                    err.printStackTrace();
-                    Racebot.log(err.getMessage());
-                }
-            }
-            channel.sendMessage("Race "+getID()+" has finished.  GG to all the racers!");
+
+            Racebot.requestedMessage(channel, "Race "+getID()+" has finished.  GG to all the racers!");
 
             TimerTask task = new TimerTask() {
 
@@ -315,7 +308,7 @@ public class Race {
                                 runnerTablePS.setString(1,racer.name+racer.discriminator);
                                 ResultSet runnerTableResults = runnerTablePS.executeQuery();
                                 while (runnerTableResults.next()){
-                                    runnerTable = runnerTableResults.getString("name");
+                                    runnerTable = runnerTableResults.getString("runner_key");
                                 }
 
                                 //User was not found, add to runner_translations and create the new table tracking this runner
@@ -420,9 +413,9 @@ public class Race {
                         }
 
 
-                        channel.sendMessage("Race " + getID() + " finalized.");
+                        Racebot.requestedMessage(channel, "Race " + getID() + " finalized.");
 
-                        channel.changeName("inactive_race_channel");
+                        Racebot.requestedChannelNameChange(channel, "inactive_race_channel");
 
                         racebot.removeRace(getID());
                     }
